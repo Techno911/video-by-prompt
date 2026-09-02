@@ -1,0 +1,97 @@
+{
+  "title": "Название ролика",
+  "source_dir": "./media",
+  "output": "final_reel.mp4",
+  "duration_seconds": 12.0,
+  "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "crf": 18,
+    "preset": "slow",
+    "fade_out": 0.5
+  },
+  "safe_zone": {
+    "top": 220,
+    "bottom": 480,
+    "side": 90
+  },
+  "audio": {
+    "src": "main_video.mov",
+    "ss": 0.0,
+    "target_lufs": -14.0,
+    "true_peak": -1.5,
+    "lra": 11.0,
+    "fade_in": 0.3,
+    "fade_out": 0.8,
+    "bitrate": "192k"
+  },
+  "titles": [
+    {
+      "kind": "bottom_bar",
+      "name": "hook",
+      "left": "НАЗВАНИЕ",
+      "right": "МЕСТО ИЛИ ДАТА",
+      "start": 0.5,
+      "end": 2.5
+    },
+    {
+      "kind": "card",
+      "name": "final",
+      "kicker": "ФИНАЛ",
+      "hero": "ГЛАВНАЯ МЫСЛЬ",
+      "caption": "короткая подпись",
+      "hero_size": 92,
+      "y": 0.56,
+      "start": 9.5,
+      "end": 12.0
+    }
+  ],
+  "scenes": [
+    {
+      "n": 1,
+      "role": "HOOK",
+      "src": "main_video.mov",
+      "ss": 2.0,
+      "dur": 2.0,
+      "look": "normal",
+      "note": "самый сильный кадр"
+    },
+    {
+      "n": 2,
+      "role": "ANCHOR",
+      "src": "wide_video.mov",
+      "ss": 1.0,
+      "dur": 2.5,
+      "look": "warm",
+      "note": "место и контекст"
+    },
+    {
+      "n": 3,
+      "role": "ACTION",
+      "src": "detail_video.mov",
+      "ss": 3.0,
+      "dur": 2.5,
+      "look": "warm",
+      "note": "человек действует"
+    },
+    {
+      "n": 4,
+      "role": "PEAK",
+      "src": "main_video.mov",
+      "ss": 8.0,
+      "dur": 3.0,
+      "look": "night",
+      "note": "эмоциональный пик"
+    },
+    {
+      "n": 5,
+      "role": "AFTERTASTE",
+      "src": "main_video.mov",
+      "ss": 12.0,
+      "dur": 2.0,
+      "look": "night",
+      "note": "финальный образ"
+    }
+  ]
+}
