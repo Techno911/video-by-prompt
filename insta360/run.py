@@ -145,14 +145,41 @@ def camera_commands(keys, frames):
         lines.append(f"{t:.7f} v360 yaw {yaw:.4f}, v360 pitch {pitch:.4f};")
     return "\n".join(lines)+"\n"
 
+def projection_filter(yaw, pitch, width, height):
+    return (f"v360=input=equirect:output=flat:w={width}:h={height}:"
+            f"v_fov=85:h_fov=55:yaw={yaw}:pitch={pitch}:reset_rot=1,setsar=1")
+
 def reframe_filter(yaw, pitch, width=1080, height=1920):
     # Ключи содержат абсолютные углы. Без reset_rot v360 накапливает повороты.
-    return (f"fps=30,sendcmd=f=camera.txt,v360=input=equirect:output=flat:w={width}:h={height}:"
-            f"v_fov=85:h_fov=55:yaw={yaw}:pitch={pitch}:reset_rot=1,setsar=1")
+    return f"fps=30,sendcmd=f=camera.txt,{projection_filter(yaw, pitch, width, height)}"
+
+def read_sources(job):
+    return {row["id"]: row for row in json.loads((job / "sources.json").read_text())}
+
+def preview(job, source, second, x, y):
+    row = read_sources(job).get(source)
+    if row is None:
+        raise ValueError("Номер исходника отсутствует в sources.json.")
+    if not 0 <= second < row["seconds"]:
+        raise ValueError("Метка времени за пределами длительности исходника.")
+    if not (0 <= x <= 1 and 0 <= y <= 1):
+        raise ValueError("Координаты героя x и y задаются долями от 0 до 1.")
+    yaw = round(360*x - 180, 4)
+    pitch = round(max(-85, min(85, 90 - 180*y)), 4)
+    target = job / f"preview-{source:03d}-{second:.3f}-{x:.4f}-{y:.4f}.jpg"
+    image = subprocess.check_output([
+        "ffmpeg", "-nostdin", "-v", "error", "-ss", str(second), "-i", str(job / row["panorama"]),
+        "-frames:v", "1", "-vf", projection_filter(yaw, pitch, 432, 768),
+        "-q:v", "2", "-f", "image2pipe", "-c:v", "mjpeg", "-",
+    ])
+    if not image:
+        raise ValueError("Кадр недоступен. Попробуй метку времени раньше на несколько кадров.")
+    target.write_bytes(image)
+    print(json.dumps({"frame": str(target), "yaw": yaw, "pitch": pitch}, ensure_ascii=False))
 
 def render(job, plan):
     tools()
-    manifest = {r["id"]:r for r in json.loads((job/"sources.json").read_text())}
+    manifest = read_sources(job)
     scenes = validate_plan(json.loads(plan.read_text())["scenes"], {k:v["seconds"] for k,v in manifest.items()})
     material = job/"clips"
     material.mkdir(exist_ok=True)
@@ -198,6 +225,12 @@ def main():
     scan = sub.add_parser("prepare")
     scan.add_argument("source", type=Path)
     scan.add_argument("job", type=Path)
+    frame = sub.add_parser("preview")
+    frame.add_argument("job", type=Path)
+    frame.add_argument("source", type=int)
+    frame.add_argument("second", type=float)
+    frame.add_argument("x", type=float)
+    frame.add_argument("y", type=float)
     build = sub.add_parser("render")
     build.add_argument("job", type=Path)
     build.add_argument("plan", type=Path)
@@ -205,6 +238,8 @@ def main():
     try:
         if args.operation == "prepare":
             prepare(args.source.resolve(), args.job.resolve())
+        elif args.operation == "preview":
+            preview(args.job.resolve(), args.source, args.second, args.x, args.y)
         else:
             render(args.job.resolve(), args.plan.resolve())
     except (ValueError, OSError, RuntimeError, subprocess.CalledProcessError) as error:

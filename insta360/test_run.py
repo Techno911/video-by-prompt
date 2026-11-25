@@ -1,13 +1,39 @@
-import unittest
-from pathlib import Path
+import json
 import shutil
 import subprocess
+import sys
+import unittest
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from run import arc, camera_commands, reframe_filter, validate_plan
 
 
 class PlanTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("ffmpeg"), "Требуется FFmpeg")
+    def test_preview_returns_angles_and_writes_a_frame(self):
+        with TemporaryDirectory() as folder:
+            job = Path(folder)
+            panorama = job / "panorama.mp4"
+            subprocess.run([
+                "ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+                "testsrc2=s=320x160:r=30:d=1", "-c:v", "libx264", panorama,
+            ], check=True)
+            (job / "sources.json").write_text(json.dumps([
+                {"id": 1, "panorama": panorama.name, "seconds": 1},
+            ]))
+            command = [sys.executable, str(Path(__file__).with_name("run.py")), "preview", folder, "1"]
+            sample = subprocess.run([*command, "0.5", "0.75", "0.6"], capture_output=True, text=True)
+            self.assertEqual(sample.returncode, 0, sample.stderr)
+            angles = json.loads(sample.stdout)
+            self.assertEqual((angles["yaw"], angles["pitch"]), (90, -18))
+            frame = Path(angles["frame"])
+            self.assertEqual(frame.parent, job.resolve())
+            self.assertTrue(frame.read_bytes().startswith(b"\xff\xd8"))
+            rejected = subprocess.run([*command, "1.5", "0.75", "0.6"], capture_output=True, text=True)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("длительности", rejected.stderr)
+
     def test_interpolation_crosses_seam_by_shortest_arc(self):
         self.assertEqual(arc(175, -175, .5), -180)
 
